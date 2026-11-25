@@ -2,7 +2,7 @@
 
 File manager Android offline, dual-pane (landscape) / tab satu panel (portrait).
 Package: `com.yuda.filemanager` — Kotlin + ViewBinding + Coroutines.
-compileSdk 34, minSdk 21, targetSdk 34, abi arm64-v8a + armeabi-v7a.
+compileSdk 34, minSdk 23, targetSdk 34, abi arm64-v8a + armeabi-v7a.
 
 ## Fitur v1.0.0 (kode ini)
 - Dua panel berdampingan (landscape), tab Panel 1 / Panel 2 (portrait)
