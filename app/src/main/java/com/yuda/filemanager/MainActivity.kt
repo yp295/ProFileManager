@@ -38,6 +38,8 @@ import com.yuda.filemanager.databinding.LayoutFilePaneBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -561,15 +563,104 @@ class MainActivity : AppCompatActivity() {
         popup.menu.add(0, 1, 0, "File Baru")
         popup.menu.add(0, 2, 0, "Properti")
         popup.menu.add(0, 3, 0, "Refresh")
+        popup.menu.add(0, 4, 0, "Cari")
+        popup.menu.add(0, 5, 0, "Buat ZIP")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> newFileDialog()
                 2 -> showProperties()
                 3 -> reloadPanes()
+                4 -> searchDialog()
+                5 -> createZip()
             }
             true
         }
         popup.show()
+    }
+
+    private fun searchDialog() {
+        val pane = panes[activePaneIndex]
+        val input = EditText(this).apply { hint = "Nama file" }
+        AlertDialog.Builder(this)
+            .setTitle("Cari di ${pane.dir.absolutePath}")
+            .setView(input)
+            .setPositiveButton("Cari") { _, _ ->
+                val query = input.text.toString().trim()
+                if (query.isNotEmpty()) runSearch(pane, query)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun runSearch(pane: PaneState, query: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val results = mutableListOf<File>()
+            try {
+                for (f in pane.dir.walkTopDown().maxDepth(6)) {
+                    if (results.size >= 200) break
+                    if (f != pane.dir && f.name.contains(query, ignoreCase = true)) results.add(f)
+                }
+            } catch (e: Exception) {
+            }
+            withContext(Dispatchers.Main) {
+                if (results.isEmpty()) {
+                    toast("Tidak ditemukan")
+                    return@withContext
+                }
+                pane.backStack.push(pane.dir)
+                pane.forwardStack.clear()
+                pane.adapter.files = results.sortedWith(fileComparator(pane))
+                pane.adapter.notifyDataSetChanged()
+                pane.paneBinding.tvBreadcrumb.text = "Cari: $query"
+                updateStatus()
+            }
+        }
+    }
+
+    private fun createZip() {
+        val pane = panes[activePaneIndex]
+        val items = pane.selected.toList()
+        if (items.isEmpty()) {
+            toast("Pilih file dulu (tahan file untuk memilih)")
+            return
+        }
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        val zipName = "Arsip-$stamp.zip"
+        val zipFile = File(pane.dir, zipName)
+        binding.progressTask.visibility = View.VISIBLE
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                ZipArchiveOutputStream(zipFile.outputStream()).use { out ->
+                    items.forEach { addToZip(out, it, it.name) }
+                    out.finish()
+                }
+                withContext(Dispatchers.Main) {
+                    binding.progressTask.visibility = View.GONE
+                    pane.selected.clear()
+                    reloadPanes()
+                    toast("ZIP dibuat: $zipName")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    binding.progressTask.visibility = View.GONE
+                    toast("Gagal membuat ZIP")
+                }
+            }
+        }
+    }
+
+    private fun addToZip(out: ZipArchiveOutputStream, file: File, entryName: String) {
+        if (file.isDirectory) {
+            out.putArchiveEntry(ZipArchiveEntry("$entryName/"))
+            out.closeArchiveEntry()
+            file.listFiles()?.forEach { addToZip(out, it, "$entryName/${it.name}") }
+        } else {
+            val entry = ZipArchiveEntry(entryName)
+            entry.size = file.length()
+            out.putArchiveEntry(entry)
+            file.inputStream().use { it.copyTo(out) }
+            out.closeArchiveEntry()
+        }
     }
 
     private fun showProperties() {
@@ -616,6 +707,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openFile(file: File) {
+        when (file.extension.lowercase(Locale.US)) {
+            "txt", "log", "md", "json", "xml", "ini", "kt", "java", "str", "csf" -> {
+                startActivity(Intent(this, TextEditorActivity::class.java).apply {
+                    putExtra("path", file.absolutePath)
+                })
+                return
+            }
+            "zip" -> {
+                startActivity(Intent(this, ZipBrowserActivity::class.java).apply {
+                    putExtra("path", file.absolutePath)
+                })
+                return
+            }
+        }
         try {
             val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
