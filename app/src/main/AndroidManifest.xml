@@ -16,7 +16,7 @@
         android:label="ProFileManager"
         android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.ProFileManager">
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
@@ -26,8 +26,19 @@
             android:multiprocess="false"
             android:permission="android.permission.READ_EXTERNAL_STORAGE" />
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|screenLayout"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

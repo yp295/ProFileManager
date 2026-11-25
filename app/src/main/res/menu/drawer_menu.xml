@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="none">
+        <item
+            android:id="@+id/nav_storage"
+            android:icon="@drawable/ic_folder"
+            android:title="Penyimpanan Internal" />
+        <item
+            android:id="@+id/nav_download"
+            android:icon="@drawable/ic_folder"
+            android:title="Download" />
+        <item
+            android:id="@+id/nav_dcim"
+            android:icon="@drawable/ic_folder"
+            android:title="DCIM" />
+        <item
+            android:id="@+id/nav_pictures"
+            android:icon="@drawable/ic_folder"
+            android:title="Pictures" />
+        <item
+            android:id="@+id/nav_documents"
+            android:icon="@drawable/ic_folder"
+            android:title="Documents" />
+        <item
+            android:id="@+id/nav_music"
+            android:icon="@drawable/ic_folder"
+            android:title="Music" />
+        <item
+            android:id="@+id/nav_movies"
+            android:icon="@drawable/ic_folder"
+            android:title="Movies" />
+    </group>
+</menu>

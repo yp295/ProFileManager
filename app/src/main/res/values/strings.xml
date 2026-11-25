@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">ProFileManager</string>
+    <string name="drawer_open">Buka menu</string>
+    <string name="drawer_close">Tutup menu</string>
 </resources>

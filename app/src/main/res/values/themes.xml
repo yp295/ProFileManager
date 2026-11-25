@@ -1,5 +1,11 @@
 <resources>
     <style name="Base.Theme.ProFileManager" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorPrimaryDark">#1565C0</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="colorSurface">#1E1E1E</item>
+        <item name="colorOnSurface">#E0E0E0</item>
     </style>
 
     <style name="Theme.ProFileManager" parent="Base.Theme.ProFileManager" />

@@ -10,6 +10,40 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:title="ProFileManager"
+            app:titleTextColor="?attr/colorOnPrimary" />
+
+        <LinearLayout
+            android:id="@+id/permissionBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#3E2723"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Akses semua file belum diizinkan"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGrantAccess"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Izinkan"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
@@ -81,6 +115,7 @@
         android:id="@+id/navView"
         android:layout_width="280dp"
         android:layout_height="match_parent"
-        android:layout_gravity="start" />
+        android:layout_gravity="start"
+        app:menu="@menu/drawer_menu" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
