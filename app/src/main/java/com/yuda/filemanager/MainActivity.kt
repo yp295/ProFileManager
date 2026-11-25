@@ -13,10 +13,14 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
+import android.system.Os
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
@@ -55,7 +59,10 @@ class MainActivity : AppCompatActivity() {
     private val storageRoot: File get() = Environment.getExternalStorageDirectory()
     private val dateFmt = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.getDefault())
 
-    enum class SortMode { NAME, SIZE, DATE }
+    enum class SortMode { NAME, SIZE, DATE, TYPE }
+
+    private val prefs by lazy { getSharedPreferences("pfm", MODE_PRIVATE) }
+    private val bookmarkBaseId = 1000
 
     inner class PaneState(val paneBinding: LayoutFilePaneBinding, val index: Int) {
         var dir: File = storageRoot
@@ -150,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         setupPane(panes[1])
         setupBottomActions()
         setupDrawer()
+        refreshDrawerBookmarks()
         highlightActivePane()
         refreshPermissionState()
 
@@ -170,6 +178,39 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.toolbar_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        val pane = panes[activePaneIndex]
+        return when (item.itemId) {
+            R.id.menu_search -> { searchDialog(); true }
+            R.id.menu_sort -> { showSortMenu(pane, binding.toolbar); true }
+            R.id.menu_view -> { toggleView(pane); true }
+            R.id.menu_refresh -> { reloadPanes(); true }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun toggleView(pane: PaneState) {
+        pane.isGrid = !pane.isGrid
+        pane.adapter.isGrid = pane.isGrid
+        pane.paneBinding.rvFiles.layoutManager =
+            if (pane.isGrid) GridLayoutManager(this, 3) else LinearLayoutManager(this)
+        pane.adapter.notifyDataSetChanged()
+    }
+
+    private fun updateToolbarTitle() {
+        val path = panes[activePaneIndex].dir.absolutePath
+        supportActionBar?.title = if (path.length > 42) {
+            "…/" + path.split("/").takeLast(2).joinToString("/")
+        } else {
+            path
+        }
     }
 
     override fun onResume() {
@@ -255,29 +296,60 @@ class MainActivity : AppCompatActivity() {
         b.btnBack.setOnClickListener { goBack(pane) }
         b.btnForward.setOnClickListener { goForward(pane) }
         b.btnSort.setOnClickListener { showSortMenu(pane, b.btnSort) }
-        b.btnToggleView.setOnClickListener {
-            pane.isGrid = !pane.isGrid
-            pane.adapter.isGrid = pane.isGrid
-            b.rvFiles.layoutManager =
-                if (pane.isGrid) GridLayoutManager(this, 3) else LinearLayoutManager(this)
-            pane.adapter.notifyDataSetChanged()
-        }
+        b.btnToggleView.setOnClickListener { toggleView(pane) }
         loadDir(pane)
+    }
+
+    private fun getBookmarks(): List<String> {
+        return prefs.getStringSet("bookmarks", emptySet())?.toList()?.sorted() ?: emptyList()
+    }
+
+    private fun refreshDrawerBookmarks() {
+        val menu = binding.navView.menu
+        menu.removeGroup(R.id.group_bookmarks)
+        getBookmarks().forEachIndexed { i, path ->
+            val name = File(path).name.ifEmpty { path }
+            menu.add(R.id.group_bookmarks, bookmarkBaseId + i, i, name)
+                .setIcon(R.drawable.ic_bookmark)
+        }
+    }
+
+    private fun addBookmark() {
+        val pane = panes[activePaneIndex]
+        val set = prefs.getStringSet("bookmarks", emptySet())?.toMutableSet() ?: mutableSetOf()
+        if (set.add(pane.dir.absolutePath)) {
+            prefs.edit().putStringSet("bookmarks", set).apply()
+            refreshDrawerBookmarks()
+            toast("Bookmark ditambahkan")
+        } else {
+            toast("Sudah ada di bookmark")
+        }
     }
 
     private fun setupDrawer() {
         binding.navView.setNavigationItemSelectedListener { item ->
-            val target = when (item.itemId) {
-                R.id.nav_storage -> storageRoot
-                R.id.nav_download -> File(storageRoot, "Download")
-                R.id.nav_dcim -> File(storageRoot, "DCIM")
-                R.id.nav_pictures -> File(storageRoot, "Pictures")
-                R.id.nav_documents -> File(storageRoot, "Documents")
-                R.id.nav_music -> File(storageRoot, "Music")
-                R.id.nav_movies -> File(storageRoot, "Movies")
-                else -> null
+            when {
+                item.itemId == R.id.nav_app_manager -> {
+                    startActivity(Intent(this, AppManagerActivity::class.java))
+                }
+                item.itemId >= bookmarkBaseId -> {
+                    val path = getBookmarks().getOrNull(item.itemId - bookmarkBaseId)
+                    if (path != null) navigateTo(panes[activePaneIndex], File(path))
+                }
+                else -> {
+                    val target = when (item.itemId) {
+                        R.id.nav_storage -> storageRoot
+                        R.id.nav_download -> File(storageRoot, "Download")
+                        R.id.nav_dcim -> File(storageRoot, "DCIM")
+                        R.id.nav_pictures -> File(storageRoot, "Pictures")
+                        R.id.nav_documents -> File(storageRoot, "Documents")
+                        R.id.nav_music -> File(storageRoot, "Music")
+                        R.id.nav_movies -> File(storageRoot, "Movies")
+                        else -> null
+                    }
+                    target?.let { navigateTo(panes[activePaneIndex], it) }
+                }
             }
-            target?.let { navigateTo(panes[activePaneIndex], it) }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
@@ -289,7 +361,6 @@ class MainActivity : AppCompatActivity() {
         binding.btnDelete.setOnClickListener { deleteSelected() }
         binding.btnRename.setOnClickListener { renameSelected() }
         binding.btnNew.setOnClickListener { newFolderDialog() }
-        binding.btnSelect.setOnClickListener { selectAllToggle() }
         binding.btnMore.setOnClickListener { showMoreMenu() }
     }
 
@@ -314,6 +385,7 @@ class MainActivity : AppCompatActivity() {
             SortMode.NAME -> compareBy { it.name.lowercase(Locale.US) }
             SortMode.SIZE -> compareBy { it.length() }
             SortMode.DATE -> compareBy { it.lastModified() }
+            SortMode.TYPE -> compareBy { it.extension.lowercase(Locale.US) }
         }
         val dirFirst = compareByDescending<File> { it.isDirectory }
         return dirFirst.then(if (pane.sortAsc) base else base.reversed())
@@ -561,21 +633,92 @@ class MainActivity : AppCompatActivity() {
     private fun showMoreMenu() {
         val popup = PopupMenu(this, binding.btnMore)
         popup.menu.add(0, 1, 0, "File Baru")
-        popup.menu.add(0, 2, 0, "Properti")
-        popup.menu.add(0, 3, 0, "Refresh")
+        popup.menu.add(0, 2, 0, "Folder Baru")
+        popup.menu.add(0, 3, 0, "Pilih Semua")
         popup.menu.add(0, 4, 0, "Cari")
         popup.menu.add(0, 5, 0, "Buat ZIP")
+        popup.menu.add(0, 6, 0, "Bookmark Folder Ini")
+        popup.menu.add(0, 7, 0, "Izin (chmod)")
+        popup.menu.add(0, 8, 0, "Properti")
+        popup.menu.add(0, 9, 0, "Refresh")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> newFileDialog()
-                2 -> showProperties()
-                3 -> reloadPanes()
+                2 -> newFolderDialog()
+                3 -> selectAllToggle()
                 4 -> searchDialog()
                 5 -> createZip()
+                6 -> addBookmark()
+                7 -> {
+                    val pane = panes[activePaneIndex]
+                    if (pane.selected.size == 1) chmodDialog(pane.selected.first())
+                    else toast("Pilih 1 file untuk ubah izin")
+                }
+                8 -> showProperties()
+                9 -> reloadPanes()
             }
             true
         }
         popup.show()
+    }
+
+    private fun chmodDialog(file: File) {
+        val mode = try {
+            Os.stat(file.absolutePath).st_mode and 0x1FF
+        } catch (e: Exception) {
+            0
+        }
+        val labels = arrayOf("Baca", "Tulis", "Eksekusi")
+        val groups = arrayOf("Pemilik", "Grup", "Lainnya")
+        val boxes = mutableListOf<CheckBox>()
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), dp(8))
+        }
+        for (g in 0..2) {
+            val rowTitle = android.widget.TextView(this).apply {
+                text = groups[g]
+                setPadding(0, dp(8), 0, dp(2))
+            }
+            layout.addView(rowTitle)
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            for (b in 0..2) {
+                val bit = 1 shl (8 - (g * 3 + b))
+                val cb = CheckBox(this).apply {
+                    text = labels[b]
+                    isChecked = (mode and bit) != 0
+                }
+                boxes.add(cb)
+                row.addView(cb)
+            }
+            layout.addView(row)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Izin: ${file.name}")
+            .setView(layout)
+            .setPositiveButton("OK") { _, _ ->
+                var newMode = 0
+                boxes.forEachIndexed { i, cb ->
+                    if (cb.isChecked) newMode = newMode or (1 shl (8 - i))
+                }
+                try {
+                    Os.chmod(file.absolutePath, newMode)
+                    reloadPanes()
+                    toast("Izin diubah")
+                } catch (e: Exception) {
+                    try {
+                        Runtime.getRuntime().exec(
+                            arrayOf("chmod", String.format("%03o", newMode), file.absolutePath)
+                        )
+                        reloadPanes()
+                        toast("Izin diubah")
+                    } catch (e2: Exception) {
+                        toast("Gagal mengubah izin")
+                    }
+                }
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun searchDialog() {
@@ -678,8 +821,9 @@ class MainActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle(file.name)
-            .setMessage("Lokasi: ${file.absolutePath}\n$info\nDiubah: ${dateFmt.format(Date(file.lastModified()))}")
+            .setMessage("Lokasi: ${file.absolutePath}\n$info\nIzin: ${permsString(file)}\nDiubah: ${dateFmt.format(Date(file.lastModified()))}")
             .setPositiveButton("OK", null)
+            .setNeutralButton("Ubah Izin") { _, _ -> chmodDialog(file) }
             .show()
     }
 
@@ -691,6 +835,8 @@ class MainActivity : AppCompatActivity() {
         popup.menu.add(0, 14, 0, "Ukuran (besar-kecil)")
         popup.menu.add(0, 15, 0, "Tanggal (terbaru)")
         popup.menu.add(0, 16, 0, "Tanggal (terlama)")
+        popup.menu.add(0, 17, 0, "Jenis (A-Z)")
+        popup.menu.add(0, 18, 0, "Jenis (Z-A)")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 11 -> { pane.sortMode = SortMode.NAME; pane.sortAsc = true }
@@ -699,6 +845,8 @@ class MainActivity : AppCompatActivity() {
                 14 -> { pane.sortMode = SortMode.SIZE; pane.sortAsc = false }
                 15 -> { pane.sortMode = SortMode.DATE; pane.sortAsc = false }
                 16 -> { pane.sortMode = SortMode.DATE; pane.sortAsc = true }
+                17 -> { pane.sortMode = SortMode.TYPE; pane.sortAsc = true }
+                18 -> { pane.sortMode = SortMode.TYPE; pane.sortAsc = false }
             }
             loadDir(pane)
             true
@@ -720,6 +868,10 @@ class MainActivity : AppCompatActivity() {
                 })
                 return
             }
+            "apk" -> {
+                showApkDialog(file)
+                return
+            }
         }
         try {
             val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
@@ -733,6 +885,53 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             toast("Tidak bisa membuka file")
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun showApkDialog(file: File) {
+        val pi = try {
+            packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+        } catch (e: Exception) {
+            null
+        }
+        val appName = try {
+            pi?.applicationInfo?.let { packageManager.getApplicationLabel(it).toString() }
+        } catch (e: Exception) {
+            null
+        } ?: file.nameWithoutExtension
+        val pkg = pi?.packageName ?: "-"
+        val version = try { pi?.versionName ?: "-" } catch (e: Exception) { "-" }
+        AlertDialog.Builder(this)
+            .setTitle(appName)
+            .setMessage("Paket: $pkg\nVersi: $version\nUkuran: ${formatSize(file.length())}")
+            .setPositiveButton("Install") { _, _ ->
+                try {
+                    val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    toast("Tidak bisa install APK ini")
+                }
+            }
+            .setNeutralButton("Ekstrak APK") { _, _ ->
+                try {
+                    val out = File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                        "${pkg}-${version}.apk"
+                    )
+                    file.inputStream().use { input ->
+                        out.outputStream().use { output -> input.copyTo(output, 65536) }
+                    }
+                    toast("APK disimpan di Download/${out.name}")
+                } catch (e: Exception) {
+                    toast("Ekstrak gagal")
+                }
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     private fun mimeFor(file: File): String {
@@ -754,21 +953,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus() {
         val pane = panes[activePaneIndex]
+        val files = pane.adapter.files
+        val folders = files.count { it.isDirectory }
+        val regular = files.size - folders
         val sel = pane.selected.size
         binding.tvStatus.text = if (sel > 0) {
-            "${pane.dir.absolutePath} • $sel dipilih"
+            "$folders folder, $regular file • $sel dipilih"
         } else {
-            pane.dir.absolutePath
+            "$folders folder, $regular file"
+        }
+        updateToolbarTitle()
+    }
+
+    private fun permsString(file: File): String {
+        return try {
+            val mode = Os.stat(file.absolutePath).st_mode
+            val bits = "rwxrwxrwx"
+            val sb = StringBuilder(if (file.isDirectory) "d" else "-")
+            for (i in 0..8) {
+                sb.append(if ((mode shr (8 - i)) and 1 == 1) bits[i] else '-')
+            }
+            sb.toString()
+        } catch (e: Exception) {
+            val r = if (file.canRead()) "r" else "-"
+            val w = if (file.canWrite()) "w" else "-"
+            val x = if (file.canExecute()) "x" else "-"
+            (if (file.isDirectory) "d" else "-") + r + w + x + "------"
         }
     }
 
     private fun detailText(file: File): String {
         val date = dateFmt.format(Date(file.lastModified()))
+        val perms = permsString(file)
         return if (file.isDirectory) {
             val n = try { file.listFiles()?.size ?: 0 } catch (e: Exception) { 0 }
-            "Folder • $n item • $date"
+            "$n item • $date • $perms"
         } else {
-            "${formatSize(file.length())} • $date"
+            "${formatSize(file.length())} • $date • $perms"
         }
     }
 

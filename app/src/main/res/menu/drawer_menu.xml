@@ -30,4 +30,14 @@
             android:icon="@drawable/ic_folder"
             android:title="Movies" />
     </group>
+    <group
+        android:id="@+id/group_bookmarks"
+        android:checkableBehavior="none">
+    </group>
+    <group android:checkableBehavior="none">
+        <item
+            android:id="@+id/nav_app_manager"
+            android:icon="@drawable/ic_grid"
+            android:title="Manajer Aplikasi" />
+    </group>
 </menu>

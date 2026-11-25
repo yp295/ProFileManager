@@ -52,6 +52,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".AppManagerActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="false" />
+
+        <activity
             android:name=".ZipBrowserActivity"
             android:configChanges="orientation|screenSize"
             android:exported="false" />
