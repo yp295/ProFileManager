@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="Back"
+            android:src="@android:drawable/ic_media_previous" />
+
+        <ImageButton
+            android:id="@+id/btnForward"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="Forward"
+            android:src="@android:drawable/ic_media_next" />
+
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/tvBreadcrumb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="6dp"
+                android:text="/sdcard"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </HorizontalScrollView>
+
+        <ImageButton
+            android:id="@+id/btnSort"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="Sort"
+            android:src="@android:drawable/ic_menu_sort_alphabetically" />
+
+        <ImageButton
+            android:id="@+id/btnToggleView"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="View Mode"
+            android:src="@android:drawable/ic_menu_agenda" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvFiles"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>
